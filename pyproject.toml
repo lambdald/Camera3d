@@ -1,0 +1,34 @@
+[project]
+name = "camera3d"
+version = "1.0"
+readme = "README.md"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python",
+]
+requires-python = ">=3.8.0"
+description = "A 3D camera library for 3d vision."
+license = { text="MIT"}
+dependencies = [
+  "torch>=1.12",
+  "tensordict==0.2.1",
+]
+
+authors = [
+  {name = "lambdald", email = "lambdald@163.com"},
+]
+
+maintainers = [
+  {name = "lambdald", email = "lambdald@163.com"}
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+
+[tool.setuptools.packages.find]
+include = ["camera3d*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.h", "*.cc", "*.cu", "*.json", "py.typed", "setup.bash", "setup.zsh"]
