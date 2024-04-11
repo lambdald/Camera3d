@@ -16,6 +16,8 @@ Supported features:
 * Calculate the 3D rays corresponding to the pixel coordinates of a specific camera model in real time.
 * Undistort image by remapping pixels between different camera models.
 
+Camera3d also supports reading colmap camera files. Currently, it supports four camera models: pinhole, simple radial, opencv, and opencv fisheye.
+
 ## Installation
 
 Make sure you have installed cuda and pytorch.
@@ -27,6 +29,8 @@ pip install .
 ```
 
 ## Examples
+
+Construct a camera group and randomly generate pixel coordinates and their corresponding camera indexes. Get the camera according to the camera index, and then calculate the ray corresponding to each pixel.
 
 ```python
 from camera3d.camera import Camera, create_camera_from_dict, CameraModel
@@ -61,5 +65,18 @@ print("max project error=", diff.max().item())
 print("eps=", torch.finfo(torch.float32).eps)
 
 ```
+
+Read colmap camera files
+```python
+
+from camera3d import read_colmap_cameras
+from pathlib import Path
+
+colmap_camera_filepath = Path('sparse/0/cameras.bin')
+
+cameras = read_colmap_cameras(colmap_camera_filepath)
+print(cameras)
+```
+
 
 More examples can be found in the examples folder.
