@@ -18,6 +18,10 @@ Supported features:
 
 Camera3d also supports reading colmap camera files. Currently, it supports four camera models: pinhole, simple radial, opencv, and opencv fisheye.
 
+
+The camera class in Camera3d is a [TensorDict](https://github.com/pytorch/tensordict?tab=readme-ov-file#tensordict) object, so it possesses all the basic features of torch.Tensor such as clear, copy, fromkeys, get, items, keys, pop, popitem, setdefault, update and values.
+
+
 ## Installation
 
 Make sure you have installed cuda and pytorch.
@@ -47,6 +51,7 @@ cam = create_camera_from_dict(cam_json)
 
 N = 1920 * 1080
 indices = torch.randint(0, 2, (N,), device="cpu")
+# TensorDict indexing
 cams = cam[indices].cuda()
 
 
