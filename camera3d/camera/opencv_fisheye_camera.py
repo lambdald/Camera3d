@@ -9,22 +9,25 @@ class OpenCVFisheyeCamera(Camera):
     model = CameraModel.OpenCVFisheye
 
     def backproject_to_3d(self, uv: torch.Tensor) -> torch.Tensor:
-        f = self.params[..., :2]
-        c = self.params[..., 2:4]
-        d = self.params[..., 4:8]
+        prefix = uv.shape[:-1]
+        f = self.params[..., :2].squeeze()
+        c = self.params[..., 2:4].squeeze()
+        d = self.params[..., 4:8].squeeze()
 
         xy = (uv - c) / f
-        xy = cpp_backend.Undistort(cpp_backend.CameraModel.OpenCVFisheye, xy, d)
-        z = torch.ones(self.batch_size, dtype=torch.float32, device=uv.device).unsqueeze(-1)
+        xy = cpp_backend.Undistort(cpp_backend.CameraModel.OpenCVFisheye, xy.view(-1, 2), d.view(-1, 4).squeeze(0)).view(prefix+(2,))
+        z = torch.ones(xy.shape[:-1], dtype=torch.float32, device=uv.device).unsqueeze(-1)
 
         xyz = torch.cat([xy, z], dim=-1)
         return xyz
 
     def project_to_2d(self, points: torch.Tensor) -> torch.Tensor:
-        f = self.params[..., :2]
-        c = self.params[..., 2:4]
-        d = self.params[..., 4:8]
+        prefix = points.shape[:-1]
+
+        f = self.params[..., :2].squeeze()
+        c = self.params[..., 2:4].squeeze()
+        d = self.params[..., 4:8].squeeze()
         xy = points[..., :2] / points[..., 2:]
-        xy = cpp_backend.Distort(cpp_backend.CameraModel.OpenCVFisheye, xy, d)
+        xy = cpp_backend.Distort(cpp_backend.CameraModel.OpenCVFisheye, xy.view(-1, 2), d.view(-1, 4).squeeze(0)).view(prefix+(2,))
         uv = f * xy + c
         return uv

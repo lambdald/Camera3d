@@ -31,4 +31,4 @@ build-backend = "setuptools.build_meta"
 include = ["camera3d*"]
 
 [tool.setuptools.package-data]
-"*" = ["*.h", "*.cc", "*.cu", "*.json", "py.typed", "setup.bash", "setup.zsh"]
+"*" = ["*.h", "*.cc", "*.cu", "*.cuh", "*.cpp", "*.json", "py.typed", "setup.bash", "setup.zsh"]

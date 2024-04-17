@@ -20,9 +20,9 @@ class FoVCamera(Camera):
 
     def backproject_to_3d(self, uv: torch.Tensor) -> torch.Tensor:
         fov = self.params[..., :2]  # xfov yfov
-        f = fov2focal(fov, torch.flip(self.hws, dims=[-1]))
+        f = fov2focal(fov, torch.flip(self.hws, dims=[-1])).squeeze()
 
-        c = self.params[..., 2:]
+        c = self.params[..., 2:].squeeze()
 
         xy = (uv - c) / f
 
@@ -33,9 +33,9 @@ class FoVCamera(Camera):
 
     def project_to_2d(self, points: torch.Tensor) -> torch.Tensor:
         fov = self.params[..., :2]
-        f = fov2focal(fov, torch.flip(self.hws, dim=-1))
+        f = fov2focal(fov, torch.flip(self.hws, dim=-1)).squeeze()
 
-        c = self.params[..., 2:]
+        c = self.params[..., 2:].squeeze()
         xy = points[..., :2]
         z = points[..., 2:]
         uv = f * (xy / z) + c

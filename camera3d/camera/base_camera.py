@@ -124,7 +124,17 @@ class Camera:
 
         fov = torch.acos(torch.sum(rays[..., 0, :] * rays[..., 1, :], dim=-1))
         return fov
+    
+    def depth_to_pointcloud(self, depth_map: torch.Tensor):
+        '''z-depth map to point cloud.
+        depth map: [N, h, w, 1]
+        '''
+        if depth_map.ndim == 2:
+            depth_map = depth_map.squeeze(0).unsqueeze(-1)
 
+        directions = self.pixelwise_directions().squeeze(0)  # [n, h, w, 3]
+        xyz = directions / directions[..., 2:] * depth_map
+        return xyz
 
 def remap_cubic(img: torch.Tensor, uv: torch.Tensor, border_mode: str = "border") -> torch.Tensor:
     """Remap image using bicubic interpolation.

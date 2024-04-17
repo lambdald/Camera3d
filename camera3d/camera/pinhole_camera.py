@@ -7,19 +7,16 @@ class PinholeCamera(Camera):
     model = CameraModel.Pinhole
 
     def backproject_to_3d(self, uv: torch.Tensor) -> torch.Tensor:
-        f = self.params[..., :2]
-        c = self.params[..., 2:]
-
+        f = self.params[..., :2].squeeze()
+        c = self.params[..., 2:].squeeze()
         xy = (uv - c) / f
-
-        z = torch.ones(self.batch_size, dtype=torch.float32, device=uv.device).unsqueeze(-1)
-
+        z = torch.ones(uv.shape[:-1] + (1,), dtype=torch.float32, device=uv.device)
         xyz = torch.cat([xy, z], dim=-1)
         return xyz
 
     def project_to_2d(self, points: torch.Tensor) -> torch.Tensor:
-        f = self.params[..., :2]
-        c = self.params[..., 2:]
+        f = self.params[..., :2].squeeze()
+        c = self.params[..., 2:].squeeze()
         xy = points[..., :2]
         z = points[..., 2:]
         uv = f * xy / z + c

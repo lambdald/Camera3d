@@ -116,18 +116,31 @@ __device__ __host__ inline void _iterative_camera_undistortion(const float* para
 }
 
 __global__ void _CameraUndistortKernel(int n_pixels, const float* params, int n_params, Eigen::Vector2f* uv,
-                                       DistortionFunctor distort_func) {
+                                       DistortionFunctor distort_func, bool shared_params) {
   int pix_idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (pix_idx >= n_pixels) {
     return;
   }
-  _iterative_camera_undistortion(params + pix_idx * n_params, uv + pix_idx, distort_func);
+  _iterative_camera_undistortion(params + pix_idx * n_params * (!shared_params), uv + pix_idx, distort_func);
 }
 
 torch::Tensor Undistort(const CameraModel model, const torch::Tensor& uv, const torch::Tensor& dist_params) {
-  int n_pixels = uv.sizes()[0];
-  int n_params = dist_params.size(1);
-  CHECK_EQ(n_pixels, dist_params.sizes()[0]);
+  
+  CHECK_EQ(uv.dim(), 2);
+  CHECK_EQ(uv.size(-1), 2);
+  int n_pixels = uv.size(0);
+
+  int n_params = dist_params.size(-1);
+
+  bool shared_params = false;
+  if (dist_params.dim()==1) {
+    shared_params = true;
+  } else {
+    CHECK_EQ(n_pixels, dist_params.size(0));
+    shared_params = false;
+  }
+  
+
   auto uv_cont = uv.contiguous();
   auto dist_params_cont = dist_params.contiguous();
 
@@ -141,19 +154,19 @@ torch::Tensor Undistort(const CameraModel model, const torch::Tensor& uv, const 
   GetDistortFunctor(hostFunc, model);
 
   _CameraUndistortKernel<<<grid_dim, block_dim>>>(n_pixels, dist_params_cont.data_ptr<float>(), n_params,
-                                                  reinterpret_cast<Eigen::Vector2f*>(uv_cont.data_ptr()), hostFunc);
+                                                  reinterpret_cast<Eigen::Vector2f*>(uv_cont.data_ptr()), hostFunc, shared_params);
 
   return uv_cont;
 }
 
 __global__ void _CameraDistortKernel(int n_pixels, const float* params, int n_params, Eigen::Vector2f* uv,
-                                     DistortionFunctor distort_func) {
+                                     DistortionFunctor distort_func, bool shared_params) {
   int pix_idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (pix_idx >= n_pixels) {
     return;
   }
 
-  const float* cur_params = params + pix_idx * n_params;
+  const float* cur_params = params + pix_idx * n_params * (!shared_params);
   Eigen::Vector2f* cur_uv = uv + pix_idx;
   Eigen::Vector2f new_uv(*cur_uv);
   distort_func(cur_params, (*cur_uv)(0), (*cur_uv)(1), &new_uv(0), &new_uv(1));
@@ -161,10 +174,20 @@ __global__ void _CameraDistortKernel(int n_pixels, const float* params, int n_pa
 }
 
 torch::Tensor Distort(const CameraModel model, const torch::Tensor& uv, const torch::Tensor& dist_params) {
+  CHECK_EQ(uv.dim(), 2);
+  CHECK_EQ(uv.size(-1), 2);
   int n_pixels = uv.size(0);
-  int n_params = dist_params.size(1);
 
-  CHECK_EQ(n_pixels, dist_params.size(0));
+  int n_params = dist_params.size(-1);
+
+  bool shared_params = false;
+  if (dist_params.dim()==1) {
+    shared_params = true;
+  } else {
+    CHECK_EQ(n_pixels, dist_params.size(0));
+    shared_params = false;
+  }
+
   auto uv_cont = uv.contiguous();
   auto dist_params_cont = dist_params.contiguous();
   CK_CONT(dist_params_cont);
@@ -174,6 +197,6 @@ torch::Tensor Distort(const CameraModel model, const torch::Tensor& uv, const to
   DistortionFunctor hostFunc;
   GetDistortFunctor(hostFunc, model);
   _CameraDistortKernel<<<grid_dim, block_dim>>>(n_pixels, dist_params_cont.data_ptr<float>(), n_params,
-                                                reinterpret_cast<Eigen::Vector2f*>(uv_cont.data_ptr()), hostFunc);
+                                                reinterpret_cast<Eigen::Vector2f*>(uv_cont.data_ptr()), hostFunc, shared_params);
   return uv_cont;
 }

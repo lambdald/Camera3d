@@ -5,7 +5,7 @@ import torch
 import rich
 from rich.traceback import install
 
-install(show_locals=True)
+install(show_locals=False)
 
 import torch
 
@@ -114,3 +114,13 @@ for cam_name, cam_json in camera_dict.items():
 
     directions = cam[[0, 0, 0, 0]].cuda().pixelwise_directions()
     print(directions.shape)
+
+
+    cam = cam[[0]].cuda()
+    print(cam.shape)
+    directions = cam.pixelwise_directions()
+    uv = cam.project_to_2d(directions)
+    ray = cam.backproject_to_3d(uv)
+
+    diff = directions - ray
+    print('max=', diff.max().item())
