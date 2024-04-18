@@ -32,6 +32,7 @@ class CameraModel(Enum):
     OpenCV = CameraAttribute(model_id=4, model_name="opencv", num_params=9)
     OpenCVFisheye = CameraAttribute(model_id=5, model_name="opencv_fisheye", num_params=8)
     Panoramic = CameraAttribute(model_id=6, model_name="panoramic", num_params=0)
+    Cylinder = CameraAttribute(model_id=7, model_name="cylinder", num_params=1)
 
 
 _camera_cls_ = {}
@@ -158,7 +159,7 @@ def remap_cubic(img: torch.Tensor, uv: torch.Tensor, border_mode: str = "border"
         grid = torch.remainder(grid + 1, 2) - 1
 
     # grid = grid.unsqueeze(0).expand(batch_size, -1, -1, -1)
-    return torch.nn.functional.grid_sample(img, grid, mode="bilinear", padding_mode="border")
+    return torch.nn.functional.grid_sample(img, grid, mode="bilinear", padding_mode="zeros")
 
 
 def create_camera(type: Union[CameraModel, str], hws: torch.Tensor, params: torch.Tensor) -> Camera:
