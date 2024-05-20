@@ -26,14 +26,15 @@ def getWorld2View(R, t):
 
 
 def getWorld2View2(R, t, translate=torch.tensor([0.0, 0.0, 0.0]), scale=1.0):
-    Rt = torch.eye(4, device=R.device)
-    Rt[:3, :3] = R.transpose()
-    Rt[:3, 3] = t
+    device = R.device
+    Rt = torch.eye(4, device=device)
+    Rt[:3, :3] = R.T
+    Rt[:3, 3] = t.to(device)
     Rt[3, 3] = 1.0
 
     C2W = torch.linalg.inv(Rt)
     cam_center = C2W[:3, 3]
-    cam_center = (cam_center + translate) * scale
+    cam_center = (cam_center + translate.to(device)) * scale
     C2W[:3, 3] = cam_center
     Rt = torch.linalg.inv(C2W).float()
     return Rt
@@ -125,7 +126,7 @@ class PosedCamera:
         """
         # because the specific matrix storage of glm library, the transform may by confused.
         # todo: change glm to eigen
-        assert Transform3d.coord_type == CoordinateType.OpenCV
+        assert self.poses_w2c.coord_type == CoordinateType.OpenCV
 
         pose_w2c = self.poses_w2c.transforms.to(device)
 
@@ -143,9 +144,9 @@ class PosedCamera:
 
         projection_matrix = camera.projection_matrix(near=near, far=far).squeeze().transpose(0, 1)
 
-        R = pose_w2c.squeeze(0)[:3, :3]
-        T = pose_w2c.squeeze(0)[:3, 3]
+        R = pose_w2c.squeeze()[:3, :3].T
+        T = pose_w2c.squeeze()[:3, 3]
 
-        world_view_transform = torch.tensor(getWorld2View2(R, T)).transpose(0, 1)
+        world_view_transform = getWorld2View2(R, T).transpose(0, 1)
         full_proj_transform = (world_view_transform.unsqueeze(0).bmm(projection_matrix.unsqueeze(0))).squeeze(0)
         return world_view_transform, projection_matrix, full_proj_transform

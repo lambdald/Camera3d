@@ -139,7 +139,7 @@ class Camera:
 
     def rescale(self, scale: float):
         new_hws = torch.floor(self.hws * scale).int()
-        real_scale = (self.hws / new_hws).mean().item()
+        real_scale = (new_hws/self.hws).mean().item()
         new_params = self.rescale_params(real_scale)
         return create_camera(self.model, new_hws, new_params)
 
