@@ -26,7 +26,7 @@ def getWorld2View(R, t):
 
 
 def getWorld2View2(R, t, translate=torch.tensor([0.0, 0.0, 0.0]), scale=1.0):
-    Rt = torch.eye(4)
+    Rt = torch.eye(4, device=R.device)
     Rt[:3, :3] = R.transpose()
     Rt[:3, 3] = t
     Rt[3, 3] = 1.0
@@ -71,8 +71,10 @@ def focal2fov(focal, pixels):
 
 
 class PosedCamera:
-    def __init__(self, cameras: Camera) -> None:
+    def __init__(self, cameras: Camera, poses_c2w: Transform3d) -> None:
         self.cameras = cameras
+        self.poses_w2c = poses_c2w
+
 
     def transorm_to_coordinates(self, directions: torch.Tensor, coord_type: CoordinateType):
         if coord_type == CoordinateType.OpenGL:
@@ -84,18 +86,18 @@ class PosedCamera:
             raise NotImplementedError(f"unknown coorinate type:{coord_type}")
         return directions
 
-    def get_directions(self, indices: torch.Tensor, uv: torch.Tensor, coord_type: CoordinateType) -> torch.Tensor:
+    def get_directions(self, uv: torch.Tensor) -> torch.Tensor:
         device = uv.device
-        cameras: Camera = self.cameras[indices].to(device)
+        cameras: Camera = self.cameras.to(device)
         directions = cameras.backproject_to_3d(uv)
-        return self.transorm_to_coordinates(directions, coord_type)
+        return self.transorm_to_coordinates(directions, self.poses_w2c.coord_type)
 
-    def get_pixelwise_rays(self, indices: torch.Tensor, pose_c2w: Transform3d):
+    def get_pixelwise_rays(self):
 
-        pose_c2w = pose_c2w.transforms
-        coord_type = pose_c2w.coord_type
+        pose_c2w = self.poses_w2c.transforms
+        coord_type = self.poses_w2c.coord_type
 
-        cam: Camera = self.cameras[indices].to(pose_c2w.device)
+        cam: Camera = self.cameras.to(pose_c2w.device)
         directions = cam.pixelwise_directions()
 
         directions = self.transorm_to_coordinates(directions, coord_type)
@@ -106,17 +108,16 @@ class PosedCamera:
 
         return Ray(origin=ray_origin, direction=ray_dir, batch_size=ray_origin.shape[:-1])
 
-    def get_rays(self, indices: torch.Tensor, uv: torch.Tensor, pose_c2w: Transform3d) -> Ray:
-        pose_c2w = pose_c2w.transforms
-        coord_type = pose_c2w.coord_type
-
-        directions = self.get_directions(indices, uv, coord_type)
+    def get_rays(self, uv: torch.Tensor) -> Ray:
+        pose_c2w = torch.inverse(self.poses_w2c.transforms)
+        directions = self.get_directions(uv)
         ray_dir = (pose_c2w[..., :3, :3] @ directions.unsqueeze(-1)).squeeze(-1)
         ray_origin = pose_c2w[..., :3, 3]
         ray_dir = ray_dir / torch.norm(ray_dir, dim=-1, keepdim=True)
         return Ray(origin=ray_origin, direction=ray_dir, batch_size=uv.shape[:-1])
 
-    def get_transforms(self, indices: torch.Tensor, pose_c2w: Transform3d, near: float, far: float):
+
+    def get_transforms(self, device, near: float, far: float):
         """
         Get MVP for 3d gaussian splatting.
         The pose should be opencv coordinate(colmap coordinate).
@@ -126,20 +127,25 @@ class PosedCamera:
         # todo: change glm to eigen
         assert Transform3d.coord_type == CoordinateType.OpenCV
 
-        pose_c2w = pose_c2w.transforms
+        pose_w2c = self.poses_w2c.transforms.to(device)
 
-        assert len(indices == 1)
-        index = indices.squeeze().item()
         assert (
             self.cameras.model == CameraModel.Pinhole or self.cameras.model == CameraModel.FoV
         ), "Only support pinhole and fov camera."
-        camera: PinholeCamera = self.cameras[index]
 
-        projection_matrix = camera.projection_matrix(near=near, far=far).squeeze().transpose(0, 1).cuda()
+        if self.cameras.model == CameraModel.FoV:
+            camera: PinholeCamera = self.cameras.pinhole().to(device)
+        elif self.cameras.model == CameraModel.Pinhole:
+            camera: PinholeCamera = self.cameras.to(device)
+        else:
+            raise ValueError("Only support pinhole and fov camera.")
 
-        R = pose_c2w.squeeze(0)[:3, :3]
-        T = pose_c2w.squeeze(0)[:3, 3]
 
-        world_view_transform = torch.tensor(getWorld2View2(R, T)).transpose(0, 1).cuda()
+        projection_matrix = camera.projection_matrix(near=near, far=far).squeeze().transpose(0, 1)
+
+        R = pose_w2c.squeeze(0)[:3, :3]
+        T = pose_w2c.squeeze(0)[:3, 3]
+
+        world_view_transform = torch.tensor(getWorld2View2(R, T)).transpose(0, 1)
         full_proj_transform = (world_view_transform.unsqueeze(0).bmm(projection_matrix.unsqueeze(0))).squeeze(0)
         return world_view_transform, projection_matrix, full_proj_transform

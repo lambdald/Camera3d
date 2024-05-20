@@ -137,6 +137,16 @@ class Camera:
         xyz = directions / directions[..., 2:] * depth_map
         return xyz
 
+    def rescale(self, scale: float):
+        new_hws = torch.floor(self.hws * scale).int()
+        real_scale = (self.hws / new_hws).mean().item()
+        new_params = self.rescale_params(real_scale)
+        return create_camera(self.model, new_hws, new_params)
+
+    def rescale_params(self, scale: float):
+        raise NotImplementedError()
+
+
 def remap_cubic(img: torch.Tensor, uv: torch.Tensor, border_mode: str = "border") -> torch.Tensor:
     """Remap image using bicubic interpolation.
 

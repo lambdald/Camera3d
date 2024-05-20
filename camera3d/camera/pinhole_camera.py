@@ -37,3 +37,9 @@ class PinholeCamera(Camera):
         opengl_proj[..., 2, 3] = -(far * near) / (far - near)
         opengl_proj[..., 3, 2] = 1.0
         return opengl_proj
+
+
+    def rescale_params(self, scale: float):
+        new_params = self.params.clone()
+        new_params[..., :4] *= scale
+        return new_params
